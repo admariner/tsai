@@ -149,7 +149,7 @@ class TSMultiLabelClassification(Categorize):
     "Reversible combined transform of multi-category strings to one-hot encoded `vocab` id"
     loss_func,order=BCEWithLogitsLossFlat(),1
     def __init__(self, c=None, vocab=None, add_na=False):
-        super().__init__(vocab=vocab,add_na=add_na,sort=vocab==None)
+        super().__init__(vocab=vocab, add_na=add_na, sort=vocab is None)
         self.c = c
 
     def setups(self, dsets):
@@ -292,17 +292,19 @@ class NumpyDatasets(Datasets):
 
     def __getitem__(self, it):
         if self.inplace:
-            return tuple([ptl[it] for ptl in self.ptls])
+            return tuple(ptl[it] for ptl in self.ptls)
         else:
-            return tuple([typ(stack(ptl[it])) for i,(ptl,typ) in enumerate(zip(self.ptls,self.typs))])
+            return tuple(
+                typ(stack(ptl[it]))
+                for i, (ptl, typ) in enumerate(zip(self.ptls, self.typs))
+            )
 
     def subset(self, i):
         if is_indexer(i):
             return type(self)(tls=L([tl.subset(i) for tl in self.tls]), inplace=self.inplace, tfms=self.tfms,
                               splits=None if self.splits is None else self.splits[i], split_idx=i)
-        else:
-            splits = None if self.splits is None else L(np.arange(len(i)).tolist())
-            return type(self)(*self[i], inplace=True, tfms=None, splits=splits, split_idx=ifnone(self.split_idx, 1))
+        splits = None if self.splits is None else L(np.arange(len(i)).tolist())
+        return type(self)(*self[i], inplace=True, tfms=None, splits=splits, split_idx=ifnone(self.split_idx, 1))
 
     def __len__(self): return len(self.tls[0])
 
@@ -370,32 +372,34 @@ class TSDatasets(NumpyDatasets):
 
     def __getitem__(self, it):
         if self.inplace:
-            return tuple([ptl[it] for ptl in self.ptls])
+            return tuple(ptl[it] for ptl in self.ptls)
         else:
-            return tuple([typ(stack(ptl[it]))[...,self.sel_vars, self.sel_steps] if i==0 else typ(stack(ptl[it])) \
-                          for i,(ptl,typ) in enumerate(zip(self.ptls,self.typs))])
+            return tuple(
+                typ(stack(ptl[it]))[..., self.sel_vars, self.sel_steps]
+                if i == 0
+                else typ(stack(ptl[it]))
+                for i, (ptl, typ) in enumerate(zip(self.ptls, self.typs))
+            )
 
     def subset(self, i):
         if is_indexer(i):
             return type(self)(tls=L([tl.subset(i) for tl in self.tls]), inplace=self.inplace, tfms=self.tfms,
                               sel_vars=self.sel_vars, sel_steps=self.sel_steps, splits=None if self.splits is None else self.splits[i], split_idx=i)
-        else:
-            splits = None if self.splits is None else L(np.arange(len(i)).tolist())
-            return type(self)(*self[i], inplace=True, tfms=None,
-                              sel_vars=self.sel_vars, sel_steps=self.sel_steps, splits=splits, split_idx=ifnone(self.split_idx, 1))
+        splits = None if self.splits is None else L(np.arange(len(i)).tolist())
+        return type(self)(*self[i], inplace=True, tfms=None,
+                          sel_vars=self.sel_vars, sel_steps=self.sel_steps, splits=splits, split_idx=ifnone(self.split_idx, 1))
 
 # Cell
 def add_ds(dsets, X, y=None, inplace=True):
     "Create test datasets from X (and y) using validation transforms of `dsets`"
     items = tuple((X,)) if y is None else tuple((X, y))
-    with_labels = False if y is None else True
     if isinstance(dsets, Datasets):
+        with_labels = y is not None
         tls = dsets.tls if with_labels else dsets.tls[:dsets.n_inp]
         new_tls = L([tl._new(item, split_idx=1) for tl,item in zip(tls, items)])
         return type(dsets)(tls=new_tls)
     elif isinstance(dsets, TfmdLists):
-        new_tl = dsets._new(items, split_idx=1)
-        return new_tl
+        return dsets._new(items, split_idx=1)
     else:
         raise Exception(f"Expected a `Datasets` or a `TfmdLists` but got {dsets.__class__.__name__}")
 
@@ -433,9 +437,7 @@ class NumpyDataLoader(TfmdDL):
 
         if num_workers is None: num_workers = min(16, defaults.cpus)
         for nm in _batch_tfms:
-            if nm == 'after_batch':
-                if batch_tfms is not None: kwargs[nm] = Pipeline(batch_tfms if is_listy(batch_tfms) else [batch_tfms])
-                else: kwargs[nm] = Pipeline(kwargs.get(nm,None))
+            if nm == 'after_batch' and batch_tfms is not None: kwargs[nm] = Pipeline(batch_tfms if is_listy(batch_tfms) else [batch_tfms])
             else: kwargs[nm] = Pipeline(kwargs.get(nm,None))
         bs = min(bs, len(dataset))
         if is_listy(partial_n): partial_n = partial_n[0]
@@ -465,8 +467,7 @@ class NumpyDataLoader(TfmdDL):
     def new_dl(self, X, y=None):
         assert X.ndim == 3, "You must pass an X with 3 dimensions [batch_size x n_vars x seq_len]"
         if y is not None and not is_array(y) and not is_listy(y): y = [y]
-        new_dloader = self.new(self.dataset.add_dataset(X, y=y))
-        return new_dloader
+        return self.new(self.dataset.add_dataset(X, y=y))
 
     def create_batch(self, b):
         if self.shuffle:
@@ -485,8 +486,7 @@ class NumpyDataLoader(TfmdDL):
 
     def get_idxs(self):
         if self.n==0: return []
-        if self.partial_n is not None: n = min(self.partial_n, self.n)
-        else: n = self.n
+        n = min(self.partial_n, self.n) if self.partial_n is not None else self.n
         if self.weights is not None:
             return np.random.choice(self.n, n, p=self.weights)
         idxs = Inf.count if self.indexed else Inf.nones
@@ -615,25 +615,25 @@ class NumpyDataLoader(TfmdDL):
 
     @property
     def cws(self):
-        if self.cat:
-            if self.ptls[-1].ndim == 2: # one hot encoded
-                pos_per_class = self.ptls[-1].sum(0)
-                neg_per_class = (len(self.ptls[-1]) - pos_per_class)
-                pos_weights = neg_per_class / pos_per_class
-                pos_weights[pos_weights == float('inf')] = 0
-                return torch.Tensor(pos_weights).to(self.device)
-            else:
-                counts = torch.unique(self.ptls[-1].flatten(), return_counts=True, sorted=True)[-1]
-                iw = (counts.sum() / counts)
-                return (iw / iw.sum()).to(self.device)
-        else: return None
+        if not self.cat:
+            return None
+        if self.ptls[-1].ndim == 2: # one hot encoded
+            pos_per_class = self.ptls[-1].sum(0)
+            neg_per_class = (len(self.ptls[-1]) - pos_per_class)
+            pos_weights = neg_per_class / pos_per_class
+            pos_weights[pos_weights == float('inf')] = 0
+            return torch.Tensor(pos_weights).to(self.device)
+        else:
+            counts = torch.unique(self.ptls[-1].flatten(), return_counts=True, sorted=True)[-1]
+            iw = (counts.sum() / counts)
+            return (iw / iw.sum()).to(self.device)
 
     @property
     def class_priors(self):
-        if self.cws is not None:
-            cp = 1. / (self.cws + 1e-8)
-            return (cp / cp.sum()).to(self.device)
-        else: return None
+        if self.cws is None:
+            return None
+        cp = 1. / (self.cws + 1e-8)
+        return (cp / cp.sum()).to(self.device)
 
 
 class TSDataLoader(NumpyDataLoader):
@@ -669,8 +669,7 @@ class NumpyDataLoaders(DataLoaders):
     def new_dl(self, X, y=None):
         assert X.ndim == 3, "You must pass an X with 3 dimensions [batch_size x n_vars x seq_len]"
         if y is not None and not is_array(y) and not is_listy(y): y = [y]
-        new_dloader = self.new(self.dataset.add_dataset(X, y=y))
-        return new_dloader
+        return self.new(self.dataset.add_dataset(X, y=y))
 
     @delegates(plt.subplots)
     def show_dist(self, figsize=None, **kwargs): self.loaders[0].show_dist(figsize=figsize, **kwargs)
@@ -836,9 +835,20 @@ def get_ts_dls(X, y=None, splits=None, sel_vars=None, sel_steps=None, tfms=None,
     if weights is not None:
         assert len(X) == len(weights)
         if splits is not None: weights = [weights[split] if i == 0 else None for i,split in enumerate(splits)] # weights only applied to train set
-    dls   = TSDataLoaders.from_dsets(dsets.train, dsets.valid, path=path, bs=bs, batch_tfms=batch_tfms, num_workers=num_workers,
-                                     device=device, shuffle_train=shuffle_train, drop_last=drop_last, weights=weights, partial_n=partial_n, **kwargs)
-    return dls
+    return TSDataLoaders.from_dsets(
+        dsets.train,
+        dsets.valid,
+        path=path,
+        bs=bs,
+        batch_tfms=batch_tfms,
+        num_workers=num_workers,
+        device=device,
+        shuffle_train=shuffle_train,
+        drop_last=drop_last,
+        weights=weights,
+        partial_n=partial_n,
+        **kwargs
+    )
 
 def get_ts_dl(X, y=None, sel_vars=None, sel_steps=None, tfms=None, inplace=True,
             path='.', bs=64, batch_tfms=None, num_workers=0, device=None, shuffle_train=True, drop_last=True, weights=None, partial_n=None, **kwargs):

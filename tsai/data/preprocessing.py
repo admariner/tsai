@@ -54,14 +54,13 @@ class Nan2Value(Transform):
         store_attr()
     def encodes(self, o:TSTensor):
         mask = torch.isnan(o)
-        if mask.any():
-            if self.median:
-                if self.by_sample_and_var:
-                    median = torch.nanmedian(o, dim=2, keepdim=True)[0].repeat(1, 1, o.shape[-1])
-                    o[mask] = median[mask]
-                else:
+        if mask.any() and self.median:
+            if self.by_sample_and_var:
+                median = torch.nanmedian(o, dim=2, keepdim=True)[0].repeat(1, 1, o.shape[-1])
+                o[mask] = median[mask]
+            else:
 #                     o = torch.nan_to_num(o, torch.nanmedian(o)) # Only available in Pytorch 1.8
-                    o = torch_nan_to_num(o, torch.nanmedian(o))
+                o = torch_nan_to_num(o, torch.nanmedian(o))
 #             o = torch.nan_to_num(o, self.value) # Only available in Pytorch 1.8
         o = torch_nan_to_num(o, self.value)
         return o
@@ -104,7 +103,7 @@ class TSStandardize(Transform):
         if by_step: drop_axes.append(2)
         self.axes = tuple([ax for ax in (0, 1, 2) if ax not in drop_axes])
         if by_var and is_listy(by_var):
-            self.list_axes = tuple([ax for ax in (0, 1, 2) if ax not in drop_axes]) + (1,)
+            self.list_axes = tuple(ax for ax in (0, 1, 2) if ax not in drop_axes) + (1,)
         self.use_single_batch = use_single_batch
         self.verbose = verbose
         if self.mean is not None or self.std is not None:
@@ -199,7 +198,7 @@ class TSNormalize(Transform):
         if by_step: drop_axes.append(2)
         self.axes = tuple([ax for ax in (0, 1, 2) if ax not in drop_axes])
         if by_var and is_listy(by_var):
-            self.list_axes = tuple([ax for ax in (0, 1, 2) if ax not in drop_axes]) + (1,)
+            self.list_axes = tuple(ax for ax in (0, 1, 2) if ax not in drop_axes) + (1,)
         self.clip_values = clip_values
         self.use_single_batch = use_single_batch
         self.verbose = verbose
@@ -407,8 +406,14 @@ class TSCyclicalPosition(Transform):
     def encodes(self, o: TSTensor):
         bs,_,seq_len = o.shape
         sin, cos = sincos_encoding(seq_len, device=o.device)
-        output = torch.cat([o, sin.reshape(1,1,-1).repeat(bs,1,1), cos.reshape(1,1,-1).repeat(bs,1,1)], 1)
-        return output
+        return torch.cat(
+            [
+                o,
+                sin.reshape(1, 1, -1).repeat(bs, 1, 1),
+                cos.reshape(1, 1, -1).repeat(bs, 1, 1),
+            ],
+            1,
+        )
 
 # Cell
 
@@ -427,8 +432,7 @@ class TSLinearPosition(Transform):
     def encodes(self, o: TSTensor):
         bs,_,seq_len = o.shape
         lin = linear_encoding(seq_len, device=o.device, lin_range=self.lin_range)
-        output = torch.cat([o, lin.reshape(1,1,-1).repeat(bs,1,1)], 1)
-        return output
+        return torch.cat([o, lin.reshape(1,1,-1).repeat(bs,1,1)], 1)
 
 # Cell
 class TSLogReturn(Transform):
@@ -460,24 +464,21 @@ class Preprocessor():
         self.preprocessor = preprocessor(**kwargs)
 
     def fit(self, o):
-        if isinstance(o, pd.Series): o = o.values.reshape(-1,1)
-        else: o = o.reshape(-1,1)
+        o = o.values.reshape(-1,1) if isinstance(o, pd.Series) else o.reshape(-1,1)
         self.fit_preprocessor = self.preprocessor.fit(o)
         return self.fit_preprocessor
 
     def transform(self, o, copy=True):
         if type(o) in [float, int]: o = array([o]).reshape(-1,1)
         o_shape = o.shape
-        if isinstance(o, pd.Series): o = o.values.reshape(-1,1)
-        else: o = o.reshape(-1,1)
+        o = o.values.reshape(-1,1) if isinstance(o, pd.Series) else o.reshape(-1,1)
         output = self.fit_preprocessor.transform(o).reshape(*o_shape)
         if isinstance(o, torch.Tensor): return o.new(output)
         return output
 
     def inverse_transform(self, o, copy=True):
         o_shape = o.shape
-        if isinstance(o, pd.Series): o = o.values.reshape(-1,1)
-        else: o = o.reshape(-1,1)
+        o = o.values.reshape(-1,1) if isinstance(o, pd.Series) else o.reshape(-1,1)
         output = self.fit_preprocessor.inverse_transform(o).reshape(*o_shape)
         if isinstance(o, torch.Tensor): return o.new(output)
         return output
@@ -503,12 +504,11 @@ def ReLabeler(cm):
             cm = class mapping dictionary
     """
     def _relabel(y):
-        obj = len(set([len(listify(v)) for v in cm.values()])) > 1
+        obj = len({len(listify(v)) for v in cm.values()}) > 1
         keys = cm.keys()
+        new_cm = {k:v for k,v in zip(keys, [listify(v) for v in cm.values()])}
         if obj:
-            new_cm = {k:v for k,v in zip(keys, [listify(v) for v in cm.values()])}
             return np.array([new_cm[yi] if yi in keys else listify(yi) for yi in y], dtype=object).reshape(*y.shape)
         else:
-            new_cm = {k:v for k,v in zip(keys, [listify(v) for v in cm.values()])}
             return np.array([new_cm[yi] if yi in keys else listify(yi) for yi in y]).reshape(*y.shape)
     return _relabel

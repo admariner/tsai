@@ -44,13 +44,12 @@ class WaveBlock(Module):
         return lp_out, all_out
 
     def create_W(self, P, is_l, is_comp=False):
-        if is_l: filter_list = self.l_filter
-        else: filter_list = self.h_filter
+        filter_list = self.l_filter if is_l else self.h_filter
         list_len = len(filter_list)
         max_epsilon = np.min(np.abs(filter_list))
         if is_comp: weight_np = np.zeros((P, P))
         else: weight_np = np.random.randn(P, P) * 0.1 * max_epsilon
-        for i in range(0, P):
+        for i in range(P):
             filter_index = 0
             for j in range(i, P):
                 if filter_index < len(filter_list):

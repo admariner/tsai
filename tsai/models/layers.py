@@ -404,9 +404,8 @@ class DropPath(nn.Module):
         shape = (x.shape[0],) + (1,) * (x.ndim - 1)
         random_tensor = keep_prob + torch.rand(shape, dtype=x.dtype, device=x.device)
         random_tensor.floor_()
-        output = x.div(keep_prob) * random_tensor
 #         output = x.div(random_tensor.mean()) * random_tensor # divide by the actual mean to mantain the input mean?
-        return output
+        return x.div(keep_prob) * random_tensor
 
 # Cell
 class Sharpen(Module):
@@ -699,11 +698,11 @@ def create_conv_head(*args, adaptive_size=None, y_range=None):
     nf = args[0]
     c_out = args[1]
     layers = [nn.AdaptiveAvgPool1d(adaptive_size)] if adaptive_size is not None else []
-    for i in range(2):
-        if nf > 1:
-            layers += [ConvBlock(nf, nf // 2, 1)]
-            nf = nf//2
-        else: break
+    for _ in range(2):
+        if nf <= 1:
+            break
+        layers += [ConvBlock(nf, nf // 2, 1)]
+        nf = nf//2
     layers += [ConvBlock(nf, c_out, 1), GAP1d(1)]
     if y_range: layers += [SigmoidRange(*y_range)]
     return nn.Sequential(*layers)
@@ -903,9 +902,7 @@ class CenterLoss(Module):
         mask = labels.eq(self.classes.expand(bs, self.c_out))
 
         dist = distmat * mask.float()
-        loss = dist.clamp(min=1e-12, max=1e+12).sum() / bs
-
-        return loss
+        return dist.clamp(min=1e-12, max=1e+12).sum() / bs
 
 
 class CenterPlusLoss(Module):

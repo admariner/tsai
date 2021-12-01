@@ -621,7 +621,7 @@ class TSTranslateX(RandTransform):
         lambd = np.random.beta(self.magnitude, self.magnitude)
         lambd = min(lambd, 1 - lambd)
         shift = int(round(seq_len * lambd))
-        if shift == 0 or shift == seq_len: return o
+        if shift in [0, seq_len]: return o
         if np.random.rand() < 0.5: shift = -shift
         new_start = max(0, shift)
         new_end = min(seq_len + shift, seq_len)
@@ -702,8 +702,12 @@ class TSResize(RandTransform):
     def encodes(self, o: TSTensor):
         if self.magnitude == 0: return o
         size = ifnone(self.size, int(round((1 + self.magnitude) * o.shape[-1])))
-        output = F.interpolate(o, size=size, mode=self.mode, align_corners=None if self.mode in ['nearest', 'area'] else False)
-        return output
+        return F.interpolate(
+            o,
+            size=size,
+            mode=self.mode,
+            align_corners=None if self.mode in ['nearest', 'area'] else False,
+        )
 
 # Cell
 class TSRandomSize(RandTransform):
@@ -856,8 +860,7 @@ class RandAugment(RandTransform):
                 t, min_val, max_val = tfm
                 tfms_ += [t(magnitude=self.magnitude * float(max_val - min_val) + min_val)]
             else:  tfms_ += [tfm()]
-        output = compose_tfms(o, tfms_, split_idx=self.split_idx)
-        return output
+        return compose_tfms(o, tfms_, split_idx=self.split_idx)
 
 # Cell
 class TestTfm(RandTransform):

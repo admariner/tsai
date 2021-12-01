@@ -46,10 +46,10 @@ class TSImage(TensorImage):
                 if self.ndim == 3: break
         if self[:3].shape[0] == 3 and kwargs == {}:
             display(to_image(self[:3]))
-            return
         else:
             TensorImage(self[:3]).show(**kwargs)
-            return
+
+        return
 
 
 class ToTSImage(Transform):

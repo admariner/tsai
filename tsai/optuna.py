@@ -54,7 +54,7 @@ def run_optuna_study(objective, resume=None, study_type=None, multivariate=True,
         if study_type is None or "bayes" in study_type.lower():
             sampler = optuna.samplers.TPESampler(seed=seed, multivariate=multivariate)
         elif "grid" in study_type.lower():
-            assert search_space, f"you need to pass a search_space dict to run a gridsearch"
+            assert search_space, 'you need to pass a search_space dict to run a gridsearch'
             sampler = optuna.samplers.GridSampler(search_space)
         elif "random" in study_type.lower():
             sampler = optuna.samplers.RandomSampler(seed=seed)
@@ -103,13 +103,13 @@ def run_optuna_study(objective, resume=None, study_type=None, multivariate=True,
     try:
         pruned_trials = [t for t in study.trials if t.state == optuna.trial.TrialState.PRUNED]
         complete_trials = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
-        print(f"\nStudy statistics    : ")
+        print('\nStudy statistics    : ')
         print(f"  Study name        : {study.study_name}")
         print(f"  # finished trials : {len(study.trials)}")
         print(f"  # pruned trials   : {len(pruned_trials)}")
         print(f"  # complete trials : {len(complete_trials)}")
 
-        print(f"\nBest trial          :")
+        print('\nBest trial          :')
         trial = study.best_trial
         print(f"  value             : {trial.value}")
         print(f"  best_params = {trial.params}\n")

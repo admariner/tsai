@@ -31,7 +31,7 @@ class PredictionDynamics(Callback):
         self.run = not hasattr(self.learn, 'lr_finder') and not hasattr(self, "gather_preds")
         if not self.run:
             return
-        self.cat = True if (hasattr(self.dls, "c") and self.dls.c > 1) else False
+        self.cat = bool((hasattr(self.dls, "c") and self.dls.c > 1))
         if self.show_perc != 1:
             valid_size = len(self.dls.valid.dataset)
             self.show_idxs = np.random.choice(valid_size, int(round(self.show_perc * valid_size)), replace=False)

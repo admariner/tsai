@@ -23,7 +23,7 @@ class MixedDataLoader():
         self.device = device
         self.c = None
         self.d = None
-        self.bs = ifnone(bs, min([dl.bs for dl in loaders]))
+        self.bs = ifnone(bs, min(dl.bs for dl in loaders))
         for i, dl in enumerate(loaders):  # ensure all dls have the same bs
             if hasattr(dl, 'vars'):
                 self.vars = dl.vars
@@ -47,7 +47,7 @@ class MixedDataLoader():
         self.count = 0
         self.fake_l = _FakeLoader(self, False, 0, 0, 0) if version.parse(
             fastai.__version__) >= version.parse("2.1") else _FakeLoader(self, False, 0, 0)
-        if sum([len(dl.dataset) for dl in loaders]) > 0:
+        if sum(len(dl.dataset) for dl in loaders) > 0:
             self._get_idxs()  # Do not apply on an empty dataset
 
     def new(self, *args, **kwargs):
@@ -74,7 +74,7 @@ class MixedDataLoader():
         self.x_idxs = self._split_idxs(self.n_inps)
 
         # Identify duplicate targets
-        dl_dict = dict(zip(range(0, len(self.loaders)), self.n_inps))
+        dl_dict = dict(zip(range(len(self.loaders)), self.n_inps))
         outs = L([])
         for key, n_inp in dl_dict.items():
             b = next(iter(self.loaders[key]))
@@ -94,8 +94,15 @@ class MixedDataLoader():
                 batch = dl.after_batch(batch)
                 inps += batch[:dl.n_inp]
                 outs += batch[dl.n_inp:]
-            inps = tuple([tuple(L(inps)[idx]) if isinstance(idx, list) else inps[idx]
-                          for idx in self.x_idxs]) if len(self.x_idxs) > 1 else tuple(L(outs)[self.x_idxs][0])
+            inps = (
+                tuple(
+                    tuple(L(inps)[idx]) if isinstance(idx, list) else inps[idx]
+                    for idx in self.x_idxs
+                )
+                if len(self.x_idxs) > 1
+                else tuple(L(outs)[self.x_idxs][0])
+            )
+
             outs = tuple(L(outs)[self.y_idxs]) if len(self.y_idxs) > 1 else L(outs)[self.y_idxs][0]
             yield inps, outs
 
@@ -128,10 +135,7 @@ class MixedDataLoader():
 
     def _arrayisin(self, arr, arr_list):
         "Checks if `arr` is in `arr_list`"
-        for a in arr_list:
-            if np.array_equal(arr, a):
-                return True
-        return False
+        return any(np.array_equal(arr, a) for a in arr_list)
 
     def _split_idxs(self, a):
         a_cum = np.array(a).cumsum().tolist()
@@ -161,5 +165,4 @@ def get_mixed_dls(*dls, device=None, shuffle_train=None, shuffle_valid=None, **k
         if device is None: device = dl.train.device
     mixed_train_dl = MixedDataLoader(*_mixed_train_dls, shuffle=shuffle_train, **kwargs)
     mixed_valid_dl = MixedDataLoader(*_mixed_valid_dls, shuffle=shuffle_valid, **kwargs)
-    mixed_dls = MixedDataLoaders(mixed_train_dl, mixed_valid_dl, device=device)
-    return mixed_dls
+    return MixedDataLoaders(mixed_train_dl, mixed_valid_dl, device=device)

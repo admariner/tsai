@@ -135,12 +135,12 @@ class _TSTEncoder(Module):
     def forward(self, src:Tensor, key_padding_mask:Optional[Tensor]=None, attn_mask:Optional[Tensor]=None):
         output = src
         scores = None
-        if self.res_attention:
-            for mod in self.layers: output, scores = mod(output, prev=scores, key_padding_mask=key_padding_mask, attn_mask=attn_mask)
-            return output
-        else:
-            for mod in self.layers: output = mod(output, key_padding_mask=key_padding_mask, attn_mask=attn_mask)
-            return output
+        for mod in self.layers:
+            if self.res_attention:
+                output, scores = mod(output, prev=scores, key_padding_mask=key_padding_mask, attn_mask=attn_mask)
+            else:
+                output = mod(output, key_padding_mask=key_padding_mask, attn_mask=attn_mask)
+        return output
 
 # Internal Cell
 class _TSTBackbone(Module):
@@ -216,7 +216,7 @@ class _TSTBackbone(Module):
 
     def _positional_encoding(self, pe, learn_pe, q_len, d_model):
         # Positional encoding
-        if pe == None:
+        if pe is None:
             W_pos = torch.empty((q_len, d_model), device=default_device()) # pe = None and learn_pe = False can be used to measure impact of pe
             nn.init.uniform_(W_pos, -0.02, 0.02)
             learn_pe = False
@@ -226,7 +226,7 @@ class _TSTBackbone(Module):
         elif pe == 'zeros':
             W_pos = torch.empty((q_len, d_model), device=default_device())
             nn.init.uniform_(W_pos, -0.02, 0.02)
-        elif pe == 'normal' or pe == 'gauss':
+        elif pe in ['normal', 'gauss']:
             W_pos = torch.zeros((q_len, 1), device=default_device())
             torch.nn.init.normal_(W_pos, mean=0.0, std=0.1)
         elif pe == 'uniform':
@@ -244,15 +244,13 @@ class _TSTBackbone(Module):
     def _key_padding_mask(self, x):
         if self.padding_var is not None:
             mask = TSMaskTensor(x[:, self.padding_var] == 1)            # key_padding_mask: [bs x q_len]
-            return x, mask
         else:
             mask = torch.isnan(x)
             x[mask] = 0
-            if mask.any():
-                mask = TSMaskTensor((mask.float().mean(1)==1).bool())   # key_padding_mask: [bs x q_len]
-                return x, mask
-            else:
+            if not mask.any():
                 return x, None
+            mask = TSMaskTensor((mask.float().mean(1)==1).bool())   # key_padding_mask: [bs x q_len]
+        return x, mask
 
 # Cell
 class TSTPlus(nn.Sequential):
@@ -392,7 +390,5 @@ class _Splitter(Module):
             x = [x[:, feat] for feat in self.feat_list]
         else:
             x = torch.split(x, self.feat_list, dim=1)
-        _out = []
-        for xi, branch in zip(x, self.branches): _out.append(branch(xi))
-        output = torch.cat(_out, dim=1)
-        return output
+        _out = [branch(xi) for xi, branch in zip(x, self.branches)]
+        return torch.cat(_out, dim=1)

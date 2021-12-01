@@ -43,16 +43,15 @@ def save_all(self:Learner, path='export', dls_fname='dls', model_fname='model', 
     if not os.path.exists(path): os.makedirs(path)
 
     self.dls_type = self.dls.__class__.__name__
+    dls_fnames = []
     if self.dls_type == "MixedDataLoaders":
         self.n_loaders = (len(self.dls.loaders), len(self.dls.loaders[0].loaders))
-        dls_fnames = []
         for i,dl in enumerate(self.dls.loaders):
             for j,l in enumerate(dl.loaders):
                 l = l.new(num_workers=1)
                 torch.save(l, path/f'{dls_fname}_{i}_{j}.pth')
                 dls_fnames.append(f'{dls_fname}_{i}_{j}.pth')
     else:
-        dls_fnames = []
         self.n_loaders = len(self.dls.loaders)
         for i,dl in enumerate(self.dls):
             dl = dl.new(num_workers=1)
@@ -66,7 +65,7 @@ def save_all(self:Learner, path='export', dls_fname='dls', model_fname='model', 
     # Export learn without the items and the optimizer state for inference
     self.export(path/f'{learner_fname}.pkl')
 
-    pv(f'Learner saved:', verbose)
+    pv('Learner saved:', verbose)
     pv(f"path          = '{path}'", verbose)
     pv(f"dls_fname     = '{dls_fnames}'", verbose)
     pv(f"model_fname   = '{model_fname}.pth'", verbose)
@@ -77,16 +76,14 @@ def load_all(path='export', dls_fname='dls', model_fname='model', learner_fname=
 
     if isinstance(device, int): device = torch.device('cuda', device)
     elif device is None: device = default_device()
-    if device == 'cpu': cpu = True
-    else: cpu = None
-
+    cpu = True if device == 'cpu' else None
     path = Path(path)
     learn = load_learner(path/f'{learner_fname}.pkl', cpu=cpu, pickle_module=pickle_module)
     learn.load(f'{model_fname}', with_opt=True, device=device)
 
 
+    dls_fnames = []
     if learn.dls_type == "MixedDataLoaders":
-        dls_fnames = []
         _dls = []
         for i in range(learn.n_loaders[0]):
             _dl = []
@@ -101,7 +98,6 @@ def load_all(path='export', dls_fname='dls', model_fname='model', learner_fname=
 
     else:
         loaders = []
-        dls_fnames = []
         for i in range(learn.n_loaders):
             dl = torch.load(path/f'{dls_fname}_{i}.pth', map_location=device, pickle_module=pickle_module)
             dl = dl.new(num_workers=0)
@@ -112,7 +108,7 @@ def load_all(path='export', dls_fname='dls', model_fname='model', learner_fname=
         learn.dls = type(learn.dls)(*loaders, path=learn.dls.path, device=device)
 
 
-    pv(f'Learner loaded:', verbose)
+    pv('Learner loaded:', verbose)
     pv(f"path          = '{path}'", verbose)
     pv(f"dls_fname     = '{dls_fnames}'", verbose)
     pv(f"model_fname   = '{model_fname}.pth'", verbose)
@@ -312,7 +308,7 @@ def feature_importance(self:Learner, feature_names=None, key_metric_idx=0, show_
     y_valid = self.dls.valid.dataset.tls[1].items
 
     metrics = [mn for mn in self.recorder.metric_names if mn not in ['epoch', 'train_loss', 'valid_loss', 'time']]
-    if len(metrics) == 0 or key_metric_idx is None:
+    if not metrics or key_metric_idx is None:
         metric_name = self.loss_func.__class__.__name__
         key_metric_idx = None
     else:

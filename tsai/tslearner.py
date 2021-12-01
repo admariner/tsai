@@ -45,7 +45,10 @@ class TSClassifier(Learner):
         if arch is None:
             arch = InceptionTimePlus
         elif isinstance(arch, str): arch = get_arch(arch)
-        if 'xresnet' in arch.__name__.lower() and not '1d' in arch.__name__.lower():
+        if (
+            'xresnet' in arch.__name__.lower()
+            and '1d' not in arch.__name__.lower()
+        ):
             model = build_tsimage_model(arch, dls=dls, pretrained=pretrained, init=init, device=device, verbose=verbose, arch_config=arch_config)
         elif 'tabularmodel' in arch.__name__.lower():
             build_tabular_model(arch, dls=dls, device=device, arch_config=arch_config)
@@ -99,7 +102,10 @@ class TSRegressor(Learner):
         if arch is None:
             arch = InceptionTimePlus
         elif isinstance(arch, str): arch = get_arch(arch)
-        if 'xresnet' in arch.__name__.lower() and not '1d' in arch.__name__.lower():
+        if (
+            'xresnet' in arch.__name__.lower()
+            and '1d' not in arch.__name__.lower()
+        ):
             model = build_tsimage_model(arch, dls=dls, pretrained=pretrained, init=init, device=device, verbose=verbose, arch_config=arch_config)
         elif 'tabularmodel' in arch.__name__.lower():
             build_tabular_model(arch, dls=dls, device=device, arch_config=arch_config)
@@ -152,7 +158,10 @@ class TSForecaster(Learner):
         if arch is None:
             arch = InceptionTimePlus
         elif isinstance(arch, str): arch = get_arch(arch)
-        if 'xresnet' in arch.__name__.lower() and not '1d' in arch.__name__.lower():
+        if (
+            'xresnet' in arch.__name__.lower()
+            and '1d' not in arch.__name__.lower()
+        ):
             model = build_tsimage_model(arch, dls=dls, pretrained=pretrained, init=init, device=device, verbose=verbose, arch_config=arch_config)
         elif 'tabularmodel' in arch.__name__.lower():
             build_tabular_model(arch, dls=dls, device=device, arch_config=arch_config)

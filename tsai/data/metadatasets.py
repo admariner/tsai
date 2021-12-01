@@ -25,7 +25,7 @@ class TSMetaDataset():
         if self.split is not None:
             return len(self.split)
         else:
-            return sum([len(ds) for ds in self.datasets])
+            return sum(len(ds) for ds in self.datasets)
 
     def __getitem__(self, idx):
         if self.split is not None: idx = self.split[idx]
@@ -35,8 +35,7 @@ class TSMetaDataset():
         self.mapping_idxs = idxs
         ds = np.unique(idxs[:, 0])
         b = [self.datasets[d][idxs[idxs[:, 0] == d, 1]] for d in ds]
-        output = tuple(map(torch.cat, zip(*b)))
-        return output
+        return tuple(map(torch.cat, zip(*b)))
 
     def _mapping(self):
         lengths = [len(ds) for ds in self.datasets]

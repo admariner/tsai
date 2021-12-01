@@ -52,8 +52,7 @@ class build_layer_with_layer_parameter(Module):
             conv_result = conv(x)
             conv_result_list.append(conv_result)
 
-        result = F.relu(torch.cat(tuple(conv_result_list), 1))
-        return result
+        return F.relu(torch.cat(tuple(conv_result_list), 1))
 
 
 class OmniScaleCNN(Module):
@@ -69,9 +68,11 @@ class OmniScaleCNN(Module):
             self.layer_list.append(layer)
         self.net = nn.Sequential(*self.layer_list)
         self.gap = GAP1d(1)
-        out_put_channel_number = 0
-        for final_layer_parameters in layer_parameter_list[-1]:
-            out_put_channel_number = out_put_channel_number + final_layer_parameters[1]
+        out_put_channel_number = sum(
+            final_layer_parameters[1]
+            for final_layer_parameters in layer_parameter_list[-1]
+        )
+
         self.hidden = nn.Linear(out_put_channel_number, c_out)
 
     def forward(self, x):
@@ -83,19 +84,14 @@ class OmniScaleCNN(Module):
 def get_Prime_number_in_a_range(start, end):
     Prime_list = []
     for val in range(start, end + 1):
-        prime_or_not = True
-        for n in range(2, val):
-            if (val % n) == 0:
-                prime_or_not = False
-                break
+        prime_or_not = all(val % n != 0 for n in range(2, val))
         if prime_or_not:
             Prime_list.append(val)
     return Prime_list
 
 
 def get_out_channel_number(paramenter_layer, in_channel, prime_list):
-    out_channel_expect = int(paramenter_layer / (in_channel * sum(prime_list)))
-    return out_channel_expect
+    return int(paramenter_layer / (in_channel * sum(prime_list)))
 
 
 def generate_layer_parameter_list(start, end, paramenter_number_of_layer_list, in_channel=1):
@@ -105,9 +101,7 @@ def generate_layer_parameter_list(start, end, paramenter_number_of_layer_list, i
     for paramenter_number_of_layer in paramenter_number_of_layer_list:
         out_channel = get_out_channel_number(paramenter_number_of_layer, in_channel, prime_list)
 
-        tuples_in_layer = []
-        for prime in prime_list:
-            tuples_in_layer.append((in_channel, out_channel, prime))
+        tuples_in_layer = [(in_channel, out_channel, prime) for prime in prime_list]
         in_channel = len(prime_list) * out_channel
 
         layer_parameter_list.append(tuples_in_layer)

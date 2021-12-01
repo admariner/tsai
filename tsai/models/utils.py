@@ -101,13 +101,12 @@ def transfer_weights(model, weights_path:Path, device:torch.device=None, exclude
             else: unmatched_layers.append(name)
         else:
             unmatched_layers.append(name)
-            pass # these are weights that weren't in the original model, such as a new head
-    if matched_layers == 0: raise Exception("No shared weight names were found between the models")
+    if matched_layers == 0:
+        if matched_layers == 0: raise Exception("No shared weight names were found between the models")
+    if unmatched_layers:
+        print(f'check unmatched_layers: {unmatched_layers}')
     else:
-        if len(unmatched_layers) > 0:
-            print(f'check unmatched_layers: {unmatched_layers}')
-        else:
-            print(f"weights from {weights_path} successfully transferred!\n")
+        print(f"weights from {weights_path} successfully transferred!\n")
 
 
 def build_ts_model(arch, c_in=None, c_out=None, seq_len=None, d=None, dls=None, device=None, verbose=False,
@@ -124,12 +123,29 @@ def build_ts_model(arch, c_in=None, c_out=None, seq_len=None, d=None, dls=None, 
             kwargs['custom_head'] = partial(lin_3d_head, d=d)
         else:
             kwargs['custom_head'] = partial(kwargs['custom_head'], d=d)
-    if sum([1 for v in ['RNN_FCN', 'LSTM_FCN', 'RNNPlus', 'LSTMPlus', 'GRUPlus', 'InceptionTime', 'TSiT',
-                        'GRU_FCN', 'OmniScaleCNN', 'mWDN', 'TST', 'XCM', 'MLP', 'MiniRocket', 'InceptionRocket']
-            if v in arch.__name__]):
+    if sum(
+        v in arch.__name__
+        for v in [
+            'RNN_FCN',
+            'LSTM_FCN',
+            'RNNPlus',
+            'LSTMPlus',
+            'GRUPlus',
+            'InceptionTime',
+            'TSiT',
+            'GRU_FCN',
+            'OmniScaleCNN',
+            'mWDN',
+            'TST',
+            'XCM',
+            'MLP',
+            'MiniRocket',
+            'InceptionRocket',
+        ]
+    ):
         pv(f'arch: {arch.__name__}(c_in={c_in} c_out={c_out} seq_len={seq_len} device={device}, arch_config={arch_config}, kwargs={kwargs})', verbose)
         model = arch(c_in, c_out, seq_len=seq_len, **arch_config, **kwargs).to(device=device)
-    elif 'xresnet' in arch.__name__ and not '1d' in arch.__name__:
+    elif 'xresnet' in arch.__name__ and '1d' not in arch.__name__:
         pv(f'arch: {arch.__name__}(c_in={c_in} c_out={c_out} device={device}, arch_config={arch_config}, kwargs={kwargs})', verbose)
         model = (arch(c_in=c_in, n_out=c_out, **arch_config, **kwargs)).to(device=device)
     elif 'minirockethead' in arch.__name__.lower():
@@ -157,7 +173,9 @@ def build_ts_model(arch, c_in=None, c_out=None, seq_len=None, d=None, dls=None, 
         model.backbone = model[:cut]
         model.head = model[cut:]
 
-    if pretrained and not ('xresnet' in arch.__name__ and not '1d' in arch.__name__):
+    if pretrained and (
+        'xresnet' not in arch.__name__ or '1d' in arch.__name__
+    ):
         assert weights_path is not None, "you need to pass a valid weights_path to use a pre-trained model"
         transfer_weights(model, weights_path, exclude_head=exclude_head, device=device)
 
@@ -183,8 +201,7 @@ def build_tabular_model(arch, dls, layers=None, emb_szs=None, n_out=None, y_rang
     if y_range is None and 'y_range' in kwargs: y_range = kwargs.pop('y_range')
     model = arch(emb_szs, len(dls.cont_names), n_out, layers, y_range=y_range, **arch_config, **kwargs).to(device=device)
 
-    if hasattr(model, "head_nf"):  head_nf = model.head_nf
-    else: head_nf = get_nf(model)
+    head_nf = model.head_nf if hasattr(model, "head_nf") else get_nf(model)
     setattr(model, "__name__", arch.__name__)
     if head_nf is not None: setattr(model, "head_nf", head_nf)
     return model
@@ -235,9 +252,7 @@ def change_model_head(model, custom_head, **kwargs):
 # Cell
 def naive_forecaster(o, split, horizon=1):
     if is_listy(horizon):
-        _f = []
-        for h in horizon:
-            _f.append(o[np.asarray(split)-h])
+        _f = [o[np.asarray(split)-h] for h in horizon]
         return np.stack(_f)
     return o[np.asarray(split) - horizon]
 

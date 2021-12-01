@@ -18,11 +18,10 @@ def get_acts_and_grads(model, modules, x, y=None, detach=True, cpu=False):
         with hook_outputs(modules, grad=True, detach=detach, cpu=cpu) as h_grad:
             preds = model.eval()(x)
             if y is None: preds.max(dim=-1).values.mean().backward()
+            elif preds.shape[0] == 1: preds[0, y].backward()
             else:
-                if preds.shape[0] == 1: preds[0, y].backward()
-                else:
-                    if y.ndim == 1: y = y.reshape(-1, 1)
-                    torch_slice_by_dim(preds, y).mean().backward()
+                if y.ndim == 1: y = y.reshape(-1, 1)
+                torch_slice_by_dim(preds, y).mean().backward()
     if len(modules) == 1: return h_act.stored[0].data, h_grad.stored[0][0].data
     else: return [h.data for h in h_act.stored], [h[0].data for h in h_grad.stored]
 

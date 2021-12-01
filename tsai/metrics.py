@@ -36,9 +36,8 @@ def accuracy_multi(inp, targ, thresh=0.5, sigmoid=True, by_sample=False):
     correct = (inp>thresh)==targ.bool()
     if by_sample:
         return (correct.float().mean(-1) == 1).float().mean()
-    else:
-        inp,targ = flatten_check(inp,targ)
-        return correct.float().mean()
+    inp,targ = flatten_check(inp,targ)
+    return correct.float().mean()
 
 def metrics_multi_common(inp, targ, thresh=0.5, sigmoid=True, by_sample=False):
     "Computes TP, TN, FP, FN when `inp` and `targ` are the same size."
@@ -68,8 +67,7 @@ def precision_multi(inp, targ, thresh=0.5, sigmoid=True):
     TP = torch.logical_and(correct,  (targ==1).bool()).sum()
     FP = torch.logical_and(~correct, (targ==0).bool()).sum()
 
-    precision = TP/(TP+FP)
-    return precision
+    return TP/(TP+FP)
 
 def recall_multi(inp, targ, thresh=0.5, sigmoid=True):
     "Computes recall when `inp` and `targ` are the same size."
@@ -82,8 +80,7 @@ def recall_multi(inp, targ, thresh=0.5, sigmoid=True):
     TP = torch.logical_and(correct,  (targ==1).bool()).sum()
     FN = torch.logical_and(~correct, (targ==1).bool()).sum()
 
-    recall = TP/(TP+FN)
-    return recall
+    return TP/(TP+FN)
 
 def specificity_multi(inp, targ, thresh=0.5, sigmoid=True):
     "Computes specificity (true negative rate) when `inp` and `targ` are the same size."
@@ -96,8 +93,7 @@ def specificity_multi(inp, targ, thresh=0.5, sigmoid=True):
     TN = torch.logical_and(correct,  (targ==0).bool()).sum()
     FP = torch.logical_and(~correct, (targ==0).bool()).sum()
 
-    specificity = TN/(TN+FP)
-    return specificity
+    return TN/(TN+FP)
 
 def balanced_accuracy_multi(inp, targ, thresh=0.5, sigmoid=True):
     "Computes balanced accuracy when `inp` and `targ` are the same size."
@@ -114,8 +110,7 @@ def balanced_accuracy_multi(inp, targ, thresh=0.5, sigmoid=True):
 
     TPR = TP/(TP+FN)
     TNR = TN/(TN+FP)
-    balanced_accuracy = (TPR+TNR)/2
-    return balanced_accuracy
+    return (TPR+TNR)/2
 
 def Fbeta_multi(inp, targ, beta=1.0, thresh=0.5, sigmoid=True):
     "Computes Fbeta when `inp` and `targ` are the same size."
@@ -134,11 +129,11 @@ def Fbeta_multi(inp, targ, beta=1.0, thresh=0.5, sigmoid=True):
     recall = TP/(TP+FN)
     beta2 = beta*beta
 
-    if precision+recall > 0:
-        Fbeta = (1+beta2)*precision*recall/(beta2*precision+recall)
-    else:
-        Fbeta = 0
-    return Fbeta
+    return (
+        (1 + beta2) * precision * recall / (beta2 * precision + recall)
+        if precision + recall > 0
+        else 0
+    )
 
 def F1_multi(*args, **kwargs):
     return Fbeta_multi(*args, **kwargs)  # beta defaults to 1.0
