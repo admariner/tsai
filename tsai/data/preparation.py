@@ -53,8 +53,7 @@ def df2Xy(df, sample_col=None, feat_col=None, data_cols=None, target_col=None, s
         passed_cols += target_col
     if data_cols is None:
         data_cols = [col for col in df.columns if col not in passed_cols]
-    if target_col is not None:
-        if any([t for t in target_col if t in data_cols]): print(f"Are you sure you want to include {target_col} in X?")
+    if target_col is not None and any(t for t in target_col if t in data_cols): print(f"Are you sure you want to include {target_col} in X?")
     if sort_by and sort_cols:
         df.sort_values(sort_cols, ascending=ascending, inplace=True)
 
@@ -96,8 +95,8 @@ def df2Xy(df, sample_col=None, feat_col=None, data_cols=None, target_col=None, s
     if splits is None:
         if return_names: return X, y, data_cols
         else: return X, y
+    elif return_names: return split_xy(X, y, splits), data_cols
     else:
-        if return_names: return split_xy(X, y, splits), data_cols
         return split_xy(X, y, splits)
 
 # Cell
@@ -181,8 +180,8 @@ def time_encoding(series, freq, max_val=None):
     day_of_week = weekday = dayofweek, day_of_year = dayofyear, week = week_of_year = weekofyear, month and year
     """
 
-    if freq == 'day_of_week' or freq == 'weekday': freq = 'dayofweek'
-    elif freq == 'day_of_month' or freq == 'dayofmonth': freq = 'day'
+    if freq in ['day_of_week', 'weekday']: freq = 'dayofweek'
+    elif freq in ['day_of_month', 'dayofmonth']: freq = 'day'
     elif freq == 'day_of_year': freq = 'dayofyear'
     available_freqs = ['microsecond', 'millisecond', 'second', 'minute', 'hour', 'day', 'dayofweek', 'dayofyear', 'week', 'month', 'year']
     assert freq in available_freqs
@@ -264,12 +263,12 @@ def get_gaps(o : Tensor, nan_to_num : int = 0, forward : bool = True, backward :
     _gaps = []
     if forward or nearest:
         fwd = forward_gaps(o, nan_to_num=np.nan, normalize=normalize)
-        if forward:
-            _gaps.append(fwd)
+    if forward:
+        _gaps.append(fwd)
     if backward or nearest:
         bwd = backward_gaps(o, nan_to_num=np.nan, normalize=normalize)
-        if backward:
-            _gaps.append(bwd)
+    if backward:
+        _gaps.append(bwd)
     if nearest:
         if isinstance(o, torch.Tensor):
             nst = torch.fmin(fwd, bwd)
@@ -295,18 +294,18 @@ def add_delta_timestamp_cols(df, cols=None, groupby=None, forward=True, backward
             forward_time_gaps = np.concatenate(forward_time_gaps, -1)[0].transpose(1,0)
         else:
             forward_time_gaps = forward_gaps(df[cols].values.transpose(1,0)[None], nan_to_num=np.nan, normalize=normalize)[0].transpose(1,0)
-        if forward :
-            df[[f'{col}_dt_fwd' for col in cols]] = forward_time_gaps
-            df[[f'{col}_dt_fwd' for col in cols]] = df[[f'{col}_dt_fwd' for col in cols]].fillna(nan_to_num)
+    if forward :
+        df[[f'{col}_dt_fwd' for col in cols]] = forward_time_gaps
+        df[[f'{col}_dt_fwd' for col in cols]] = df[[f'{col}_dt_fwd' for col in cols]].fillna(nan_to_num)
     if backward or nearest:
         if groupby:
             backward_time_gaps = df[cols].groupby(df[groupby]).apply(lambda x: backward_gaps(x.values.transpose(1,0)[None], nan_to_num=np.nan, normalize=normalize))
             backward_time_gaps = np.concatenate(backward_time_gaps, -1)[0].transpose(1,0)
         else:
             backward_time_gaps = backward_gaps(df[cols].values.transpose(1,0)[None], nan_to_num=np.nan, normalize=normalize)[0].transpose(1,0)
-        if backward:
-            df[[f'{col}_dt_bwd' for col in cols]] = backward_time_gaps
-            df[[f'{col}_dt_bwd' for col in cols]] = df[[f'{col}_dt_bwd' for col in cols]].fillna(nan_to_num)
+    if backward:
+        df[[f'{col}_dt_bwd' for col in cols]] = backward_time_gaps
+        df[[f'{col}_dt_bwd' for col in cols]] = df[[f'{col}_dt_bwd' for col in cols]].fillna(nan_to_num)
     if nearest:
         df[[f'{col}_dt_nearest' for col in cols]] = np.fmin(forward_time_gaps, backward_time_gaps)
         df[[f'{col}_dt_nearest' for col in cols]] = df[[f'{col}_dt_nearest' for col in cols]].fillna(nan_to_num)
@@ -364,8 +363,7 @@ def SlidingWindow(window_len:int, stride:Union[None, int]=1, start:int=0, pad_re
 
     def _inner(o):
         if copy:
-            if isinstance(o, torch.Tensor):  o = o.clone()
-            else: o = o.copy()
+            o = o.clone() if isinstance(o, torch.Tensor) else o.copy()
         if not seq_first: o = o.T
         if isinstance(o, pd.DataFrame):
             if sort_by is not None: o.sort_values(by=sort_by, axis=0, ascending=ascending, inplace=True, ignore_index=True)
@@ -379,8 +377,7 @@ def SlidingWindow(window_len:int, stride:Union[None, int]=1, start:int=0, pad_re
         else:
             if isinstance(o, torch.Tensor): o = o.numpy()
             if o.ndim < 2: o = o[:, None]
-            if get_x is None: X = o
-            else: X = o[:, _get_x]
+            X = o if get_x is None else o[:, _get_x]
             if get_y == []: y = None
             elif get_y is None: y = o
             else: y = o[:, _get_y]
@@ -405,31 +402,31 @@ def SlidingWindow(window_len:int, stride:Union[None, int]=1, start:int=0, pad_re
                          np.expand_dims(np.arange(X_max_time + 1, step=stride), 0).T
                         ) # # subwindows
         X = np.transpose(X[X_sub_windows], (0, 2, 1))
-        if get_y != [] and y is not None:
-            y_start = start + window_len - 1
-            y_max_time = seq_len - y_start - max_horizon - pad_remainder
-            div = 0
-            if pad_remainder:
-                div = y_max_time % stride
-                y_max_time = y_max_time - y_max_time % stride + stride
-                if window_len + start + y_max_time - len(y) >= 0:
-                    _y = np.empty((window_len + start + y_max_time - len(y), *y.shape[1:]))
-                    _y[:] = padding_value
-                    y = np.concatenate((y, _y))
-            y_sub_windows = (y_start +
-                             np.expand_dims(horizon_rng, 0) + # horizon_rng
-                             np.expand_dims(np.arange(y_max_time + div, step=stride), 0).T
-                            ) # # subwindows
-            y = y[y_sub_windows]
-            if y_func is not None and len(y) > 0:
-                y = y_func(y)
-            if y.ndim >= 2:
-                for d in np.arange(1, y.ndim)[::-1]:
-                    if y.shape[d] == 1: y = np.squeeze(y, axis=d)
-            if y.ndim == 3:
-                y = y.transpose(0, 2, 1)
-            return X, y
-        else: return X, None
+        if get_y == [] or y is None:
+            return X, None
+        y_start = start + window_len - 1
+        y_max_time = seq_len - y_start - max_horizon - pad_remainder
+        div = 0
+        if pad_remainder:
+            div = y_max_time % stride
+            y_max_time = y_max_time - y_max_time % stride + stride
+            if window_len + start + y_max_time - len(y) >= 0:
+                _y = np.empty((window_len + start + y_max_time - len(y), *y.shape[1:]))
+                _y[:] = padding_value
+                y = np.concatenate((y, _y))
+        y_sub_windows = (y_start +
+                         np.expand_dims(horizon_rng, 0) + # horizon_rng
+                         np.expand_dims(np.arange(y_max_time + div, step=stride), 0).T
+                        ) # # subwindows
+        y = y[y_sub_windows]
+        if y_func is not None and len(y) > 0:
+            y = y_func(y)
+        if y.ndim >= 2:
+            for d in np.arange(1, y.ndim)[::-1]:
+                if y.shape[d] == 1: y = np.squeeze(y, axis=d)
+        if y.ndim == 3:
+            y = y.transpose(0, 2, 1)
+        return X, y
     return _inner
 
 SlidingWindowSplitter = SlidingWindow
@@ -505,11 +502,11 @@ def SlidingWindowPanel(window_len:int, unique_id_cols:list, stride:Union[None, i
             for d in np.arange(1, y.ndim)[::-1]:
                 if y.shape[d] == 1: y = np.squeeze(y, axis=d)
         else: y = None
-        if return_key:
-            key = np.concatenate(_key)
-            if key.ndim == 2 and key.shape[-1] == 1: key = np.squeeze(key, -1)
-            if return_key: return X, y, key
-        else: return X, y
+        if not return_key:
+            return X, y
+        key = np.concatenate(_key)
+        if key.ndim == 2 and key.shape[-1] == 1: key = np.squeeze(key, -1)
+        if return_key: return X, y, key
 
     return _SlidingWindowPanel
 

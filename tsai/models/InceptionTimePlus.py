@@ -96,8 +96,7 @@ class InceptionTimePlus(nn.Sequential):
     def __init__(self, c_in, c_out, seq_len=None, nf=32, nb_filters=None,
                  flatten=False, concat_pool=False, fc_dropout=0., bn=False, y_range=None, custom_head=None, **kwargs):
 
-        if nb_filters is not None: nf = nb_filters
-        else: nf = ifnone(nf, nb_filters) # for compatibility
+        nf = nb_filters if nb_filters is not None else ifnone(nf, nb_filters)
         backbone = InceptionBlockPlus(c_in, nf, **kwargs)
 
         #head
@@ -107,6 +106,9 @@ class InceptionTimePlus(nn.Sequential):
         if custom_head: head = custom_head(self.head_nf, c_out, seq_len)
         else: head = self.create_head(self.head_nf, c_out, seq_len, flatten=flatten, concat_pool=concat_pool,
                                       fc_dropout=fc_dropout, bn=bn, y_range=y_range)
+
+        layers = OrderedDict([('backbone', nn.Sequential(backbone)), ('head', nn.Sequential(head))])
+        super().__init__(layers)
 
         layers = OrderedDict([('backbone', nn.Sequential(backbone)), ('head', nn.Sequential(head))])
         super().__init__(layers)
@@ -184,7 +186,5 @@ class _Splitter(Module):
             x = [x[:, feat] for feat in self.feat_list]
         else:
             x = torch.split(x, self.feat_list, dim=1)
-        _out = []
-        for xi, branch in zip(x, self.branches): _out.append(branch(xi))
-        output = torch.cat(_out, dim=1)
-        return output
+        _out = [branch(xi) for xi, branch in zip(x, self.branches)]
+        return torch.cat(_out, dim=1)

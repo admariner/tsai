@@ -95,9 +95,9 @@ def save_nb(nb_name=None, attempts=1, verbose=True, wait=2):
             if verbose: print(f'cannot save the notebook in Google Colab. Last saved {to_local_time(os.path.getmtime(nb_name))}.')
         else: 
             for i in range(attempts):
-                _save_nb() 
+                _save_nb()
                 # confirm it's saved. This takes come variable time.
-                for j in range(20):
+                for _ in range(20):
                     time.sleep(.5)
                     saved_time = os.path.getmtime(nb_name)
                     if  saved_time >= current_time: break
@@ -164,7 +164,7 @@ def beep(inp=1, duration=.1, n=1):
     rate = 10000
     mult = 1.6 * inp if inp else .08
     wave = np.sin(mult*np.arange(rate*duration))
-    for i in range(n): 
+    for _ in range(n): 
         display(Audio(wave, rate=10000, autoplay=True))
         time.sleep(duration / .1)
 
@@ -256,32 +256,33 @@ def my_setup(*pkgs):
         import tsai
         print(f'tsai           : {tsai.__version__}')
     except: 
-        print(f'tsai           : N/A')
+        print('tsai           : N/A')
     try: 
         import fastai
         print(f'fastai         : {fastai.__version__}')
     except: 
-        print(f'fastai         : N/A')
+        print('fastai         : N/A')
     try: 
         import fastcore
         print(f'fastcore       : {fastcore.__version__}')
     except: 
-        print(f'fastcore       : N/A')
-    
+        print('fastcore       : N/A')
+
     if pkgs is not None: 
         for pkg in listify(pkgs):
             try: print(f'{pkg.__name__:15}: {pkg.__version__}')
-            except: pass 
+            except: pass
     try: 
         import torch
         print(f'torch          : {torch.__version__}')
         try:
             import torch_xla
-            print(f'device         : TPU')
+            print('device         : TPU')
         except:
             iscuda = torch.cuda.is_available()
             print(f'n_cpus         : {cpus}')
             print(f'device         : {device} ({torch.cuda.get_device_name(0)})' if iscuda else f'device         : {device}')
-    except: print(f'torch          : N/A')
+    except:
+        print('torch          : N/A')
         
 computer_setup = my_setup

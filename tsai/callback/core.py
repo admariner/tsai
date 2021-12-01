@@ -169,25 +169,27 @@ class UBDAug(Callback):
         self.red = self.loss_func.reduction
 
     def before_batch(self):
-        if self.training:
-            with torch.no_grad():
-                setattr(self.loss_func, 'reduction', 'none')
-                for i in range(self.C):
-                    idxs = np.random.choice(self.n_tfms, self.N, False)
-                    x_tfm = compose_tfms(self.x, self.batch_tfms[idxs], split_idx=0)
-                    loss = self.loss_func(self.learn.model(x_tfm), self.y).reshape(-1,1)
-                    if i == 0:
-                        x2 = x_tfm.unsqueeze(1)
-                        max_loss = loss
-                    else:
-                        losses = torch.cat((max_loss, loss), dim=1)
-                        x2 = torch.cat((x2, x_tfm.unsqueeze(1)), dim=1)
-                        x2 = x2[np.arange(x2.shape[0]).reshape(-1,1), losses.argsort(1)[:, -self.S:]]
-                        max_loss = losses.max(1)[0].reshape(-1,1)
-                setattr(self.loss_func, 'reduction', self.red)
-            x2 = x2.reshape(-1, self.x.shape[-2], self.x.shape[-1])
-            if self.S > 1: self.learn.yb = (torch_tile(self.y, 2),)
-            self.learn.xb = (x2,)
+        if not self.training:
+            return
+
+        with torch.no_grad():
+            setattr(self.loss_func, 'reduction', 'none')
+            for i in range(self.C):
+                idxs = np.random.choice(self.n_tfms, self.N, False)
+                x_tfm = compose_tfms(self.x, self.batch_tfms[idxs], split_idx=0)
+                loss = self.loss_func(self.learn.model(x_tfm), self.y).reshape(-1,1)
+                if i == 0:
+                    x2 = x_tfm.unsqueeze(1)
+                    max_loss = loss
+                else:
+                    losses = torch.cat((max_loss, loss), dim=1)
+                    x2 = torch.cat((x2, x_tfm.unsqueeze(1)), dim=1)
+                    x2 = x2[np.arange(x2.shape[0]).reshape(-1,1), losses.argsort(1)[:, -self.S:]]
+                    max_loss = losses.max(1)[0].reshape(-1,1)
+            setattr(self.loss_func, 'reduction', self.red)
+        x2 = x2.reshape(-1, self.x.shape[-2], self.x.shape[-1])
+        if self.S > 1: self.learn.yb = (torch_tile(self.y, 2),)
+        self.learn.xb = (x2,)
 
     def __repr__(self): return f'UBDAug({[get_tfm_name(t) for t in self.batch_tfms]})'
 
@@ -397,16 +399,15 @@ class RandomWeightLossWrapper(Callback):
         self.learn.loss_func = self._random_weight_loss
 
     def _random_weight_loss(self, input: Tensor, target: Tensor) -> Tensor:
-        if self.training:
-            setattr(self.crit, 'reduction', 'none')
-            loss = self.crit(input, target)
-            setattr(self.crit, 'reduction', self.red)
-            rw = torch.rand(input.shape[0], device=input.device)
-            rw /= rw.sum()
-            non_red_loss = loss * rw
-            return non_red_loss.sum()
-        else:
+        if not self.training:
             return self.crit(input, target)
+        setattr(self.crit, 'reduction', 'none')
+        loss = self.crit(input, target)
+        setattr(self.crit, 'reduction', self.red)
+        rw = torch.rand(input.shape[0], device=input.device)
+        rw /= rw.sum()
+        non_red_loss = loss * rw
+        return non_red_loss.sum()
 
     def after_fit(self):
         if hasattr(self.crit, 'reduction'): setattr(self.crit, 'reduction', self.red)

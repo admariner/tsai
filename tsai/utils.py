@@ -235,7 +235,6 @@ def test_ok(f, *args, **kwargs):
         e = 0
     except:
         e = 1
-        pass
     test_eq(e, 0)
 
 def test_not_ok(f, *args, **kwargs):
@@ -244,7 +243,6 @@ def test_not_ok(f, *args, **kwargs):
         e = 0
     except:
         e = 1
-        pass
     test_eq(e, 1)
 
 def test_error(error, f, *args, **kwargs):
@@ -394,9 +392,7 @@ def ttest_tensor(a, b):
     se1, se2 = torch.std(a)/np.sqrt(len(a)), torch.std(b)/np.sqrt(len(b))
     # standard error on the difference between the samples
     sed = torch.sqrt(se1**2.0 + se2**2.0)
-    # calculate the t statistic
-    t_stat = (torch.mean(a) - torch.mean(b)) / sed
-    return t_stat
+    return (torch.mean(a) - torch.mean(b)) / sed
 
 # Cell
 from scipy.stats import pearsonr, spearmanr
@@ -419,7 +415,6 @@ def remove_fn(fn, verbose=False):
         pv(f'{fn} file removed', verbose)
     except OSError:
         pv(f'{fn} does not exist', verbose)
-        pass
 
 # Cell
 def npsave(array_fn, array, verbose=True):
@@ -434,7 +429,7 @@ np_save = npsave
 def permute_2D(array, axis=None):
     "Permute rows or columns in an array. This can be used, for example, in feature permutation"
     if axis == 0: return array[np.random.randn(*array.shape).argsort(axis=0), np.arange(array.shape[-1])[None, :]]
-    elif axis == 1 or axis == -1: return array[np.arange(len(array))[:,None], np.random.randn(*array.shape).argsort(axis=1)]
+    elif axis in [1, -1]: return array[np.arange(len(array))[:,None], np.random.randn(*array.shape).argsort(axis=1)]
     return array[np.random.randn(*array.shape).argsort(axis=0), np.random.randn(*array.shape).argsort(axis=1)]
 
 # Cell
@@ -593,25 +588,23 @@ def torch_slice_by_dim(t, index, dim=-1, **kwargs):
 def torch_nanmean(o, dim=None, keepdim=False):
     """There's currently no torch.nanmean function"""
     mask = torch.isnan(o)
-    if mask.any():
-        output = torch.from_numpy(np.asarray(np.nanmean(o.cpu().numpy(), axis=dim, keepdims=keepdim))).to(o.device)
-        if output.shape == mask.shape:
-            output[mask] = 0
-        return output
-    else:
+    if not mask.any():
         return torch.mean(o, dim=dim, keepdim=keepdim) if dim is not None else torch.mean(o)
+    output = torch.from_numpy(np.asarray(np.nanmean(o.cpu().numpy(), axis=dim, keepdims=keepdim))).to(o.device)
+    if output.shape == mask.shape:
+        output[mask] = 0
+    return output
 
 
 def torch_nanstd(o, dim=None, keepdim=False):
     """There's currently no torch.nanstd function"""
     mask = torch.isnan(o)
-    if mask.any():
-        output = torch.from_numpy(np.asarray(np.nanstd(o.cpu().numpy(), axis=dim, keepdims=keepdim))).to(o.device)
-        if output.shape == mask.shape:
-            output[mask] = 1
-        return output
-    else:
+    if not mask.any():
         return torch.std(o, dim=dim, keepdim=keepdim) if dim is not None else torch.std(o)
+    output = torch.from_numpy(np.asarray(np.nanstd(o.cpu().numpy(), axis=dim, keepdims=keepdim))).to(o.device)
+    if output.shape == mask.shape:
+        output[mask] = 1
+    return output
 
 # Cell
 def concat(*ls, dim=0):
@@ -647,13 +640,10 @@ def reduce_memory_usage(df):
                 elif c_min > np.iinfo(np.int64).min and c_max < np.iinfo(np.int64).max:
                     df[col] = df[col].astype(np.int64)
 
-            else:
-                if c_min > np.finfo(np.float16).min and c_max < np.finfo(np.float16).max:
-                    df[col] = df[col].astype(np.float16)
-                elif c_min > np.finfo(np.float32).min and c_max < np.finfo(np.float32).max:
-                    df[col] = df[col].astype(np.float32)
-                else:
-                    pass
+            elif c_min > np.finfo(np.float16).min and c_max < np.finfo(np.float16).max:
+                df[col] = df[col].astype(np.float16)
+            elif c_min > np.finfo(np.float32).min and c_max < np.finfo(np.float32).max:
+                df[col] = df[col].astype(np.float32)
         else:
             df[col] = df[col].astype('category')
 
@@ -939,11 +929,9 @@ def sincos_encoding(seq_len, device=None, to_np=False):
 # Cell
 def linear_encoding(seq_len, device=None, to_np=False, lin_range=(-1,1)):
     if to_np:
-        enc =  np.linspace(lin_range[0], lin_range[1], seq_len)
-    else:
-        if device is None: device = default_device()
-        enc = torch.linspace(lin_range[0], lin_range[1], seq_len, device=device)
-    return enc
+        return np.linspace(lin_range[0], lin_range[1], seq_len)
+    if device is None: device = default_device()
+    return torch.linspace(lin_range[0], lin_range[1], seq_len, device=device)
 
 # Cell
 def encode_positions(pos_arr, min_val=None, max_val=None, linear=False, lin_range=(-1,1)):
@@ -957,20 +945,19 @@ def encode_positions(pos_arr, min_val=None, max_val=None, linear=False, lin_rang
 
     if linear:
         return (((pos_arr - min_val)/(max_val - min_val)) * (lin_range[1] - lin_range[0]) + lin_range[0])
-    else:
-        sin = np.sin((pos_arr - min_val)/(max_val - min_val) * 2 * np.pi)
-        cos = np.cos((pos_arr - min_val)/(max_val - min_val) * 2 * np.pi)
-        return sin, cos
+    sin = np.sin((pos_arr - min_val)/(max_val - min_val) * 2 * np.pi)
+    cos = np.cos((pos_arr - min_val)/(max_val - min_val) * 2 * np.pi)
+    return sin, cos
 
 # Cell
 def sort_generator(generator, bs):
     g = list(generator)
     for i in range(len(g)//bs + 1): g[bs*i:bs*(i+1)] = np.sort(g[bs*i:bs*(i+1)])
-    return (i for i in g)
+    return iter(g)
 
 # Cell
 def get_subset_dict(d, keys):
-    return dict((k,d[k]) for k in listify(keys) if k in d)
+    return {k: d[k] for k in listify(keys) if k in d}
 
 # Cell
 def create_dir(directory, verbose=True):
@@ -990,12 +977,12 @@ def remove_dir(directory, verbose=True):
     for d in directory:
         d = Path(d)
         if d.is_file(): d = d.parent
-        if not d.exists():
-            if verbose: print(f"{d} directory doesn't exist.")
-        else:
+        if d.exists():
             shutil.rmtree(d)
             assert not d.exists(), f"a problem has occurred while deleting {d}"
             if verbose: print(f"{d} directory removed.")
+
+        elif verbose: print(f"{d} directory doesn't exist.")
 
 # Cell
 class named_partial(object):
@@ -1018,9 +1005,8 @@ def yaml2dict(fname):
 # Cell
 def str2list(o):
     if o is None: return []
-    elif o is not None and not isinstance(o, (list, L)):
-        if isinstance(o, pd.core.indexes.base.Index): o = o.tolist()
-        else: o = [o]
+    elif not isinstance(o, (list, L)):
+        o = o.tolist() if isinstance(o, pd.core.indexes.base.Index) else [o]
     return o
 
 def str2index(o):
@@ -1083,9 +1069,7 @@ def to_sincos_time(arr, max_value):
 # Cell
 def plot_feature_dist(X, percentiles=[0,0.1,0.5,1,5,10,25,50,75,90,95,99,99.5,99.9,100]):
     for i in range(X.shape[1]):
-        ys = []
-        for p in percentiles:
-            ys.append(np.percentile(X[:, i].flatten(), p))
+        ys = [np.percentile(X[:, i].flatten(), p) for p in percentiles]
         plt.plot(percentiles, ys)
         plt.xticks(percentiles, rotation='vertical')
         plt.grid(color='gainsboro', linewidth=.5)

@@ -30,8 +30,10 @@ def _mk_flag_re(body, n_params, comment):
     assert body!=True, 'magics no longer supported'
     prefix = r"\s*\#\s*"
     param_group = ""
-    if n_params == -1: param_group = r"[ \t]+(.+)"
-    if n_params == 1: param_group = r"[ \t]+(\S+)"
+    if n_params == -1:
+        param_group = r"[ \t]+(.+)"
+    elif n_params == 1:
+        param_group = r"[ \t]+(\S+)"
     if n_params == (0,1): param_group = r"(?:[ \t]+(\S+))?"
     return re.compile(rf"""
 # {comment}:
@@ -47,11 +49,13 @@ _re_hide = _mk_flag_re("hide?", 0,
     "Matches any line with #hide without any module name")
 
 def _get_unhidden_cells(cells):
-    result = []
-    for i,cell in enumerate(cells):
-        if cell['cell_type'] == 'code':
-            if not _re_hide.findall(cell['source'].lower()) and cell['source'] != '': result.append(i)
-    return result
+    return [
+        i
+        for i, cell in enumerate(cells)
+        if cell['cell_type'] == 'code'
+        and not _re_hide.findall(cell['source'].lower())
+        and cell['source'] != ''
+    ]
 
 def _read_nb(fname):
     "Read the notebook in `fname`."
@@ -116,8 +120,7 @@ def _get_kernel_id() -> str:
     """ Returns the kernel ID of the ipykernel.
     """
     connection_file = Path(ipykernel.get_connection_file()).stem
-    kernel_id = connection_file.split('-', 1)[1]
-    return kernel_id
+    return connection_file.split('-', 1)[1]
 
 def _get_sessions(srv):
     """ Given a server, returns sessions, or HTTPError if access is denied.
@@ -126,10 +129,8 @@ def _get_sessions(srv):
         server.
     """
     try:
-        qry_str = ""
         token = srv['token']
-        if token:
-            qry_str = f"?token={token}"
+        qry_str = f"?token={token}" if token else ""
         url = f"{srv['url']}api/sessions{qry_str}"
         with urllib.request.urlopen(url) as req:
             return json.load(req)
@@ -177,14 +178,14 @@ def get_nb_path() -> Path:
         or raises a FileNotFoundError exception if it cannot be determined.
     """
     try:
-        if is_colab(): return get_colab_nb_name()
+        if is_colab():
+            if is_colab(): return get_colab_nb_name()
+        srv, path = _find_nb()
+        if srv and path:
+            root_dir = Path(srv.get('root_dir') or srv['notebook_dir'])
+            return root_dir / path
         else:
-            srv, path = _find_nb()
-            if srv and path:
-                root_dir = Path(srv.get('root_dir') or srv['notebook_dir'])
-                return root_dir / path
-            else:
-                return
+            return
     except:
         return
 
@@ -231,10 +232,8 @@ def nb2py(nb:      Param("absolute or relative full path to the notebook you wan
         except: print(f"nb2py couldn't save the nb automatically. It will used last saved at {to_local_time(os.path.getmtime(nb_name))}")
 
     # script path & name
-    if folder is not None: folder = Path(folder)
-    else: folder = nb_path.parent
-    if name is not None: name = f"{Path(name).stem}.py"
-    else: name = f"{nb_path.stem}.py"
+    folder = Path(folder) if folder is not None else nb_path.parent
+    name = f"{Path(name).stem}.py" if name is not None else f"{nb_path.stem}.py"
     script_path = folder/name
 
     # delete file if exists and create script_path folder if doesn't exist
@@ -243,16 +242,16 @@ def nb2py(nb:      Param("absolute or relative full path to the notebook you wan
 
     # Write script header
     with open(script_path, 'w') as f:
-        f.write(f'# -*- coding: utf-8 -*-\n')
+        f.write('# -*- coding: utf-8 -*-\n')
         f.write(f'"""{nb_name}\n\n')
-        f.write(f'Automatically generated.\n\n')
+        f.write('Automatically generated.\n\n')
         if nb_path is not None:
-            f.write(f'Original file is located at:\n')
+            f.write('Original file is located at:\n')
             f.write(f'    {nb_path}\n')
-        f.write(f'"""')
+        f.write('"""')
 
     # identify convertible cells (excluding empty and those with hide flags)
-    for i in range(10):
+    for _ in range(10):
         try:
             nb = _read_nb(nb_path)
             break

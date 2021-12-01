@@ -27,7 +27,18 @@ class XceptionModulePlus(Module):
         kss = [ksi if ksi % 2 != 0 else ksi - 1 for ksi in kss]  # ensure odd kss for padding='same'
         self.bottleneck = Conv(ni, nf, 1, coord=coord, bias=False) if bottleneck else noop
         self.convs = nn.ModuleList()
-        for i in range(len(kss)): self.convs.append(Conv(nf if bottleneck else ni, nf, kss[i], coord=coord, separable=separable, bias=False))
+        for ks_ in kss:
+            self.convs.append(
+                Conv(
+                    nf if bottleneck else ni,
+                    nf,
+                    ks_,
+                    coord=coord,
+                    separable=separable,
+                    bias=False,
+                )
+            )
+
         self.mp_conv = nn.Sequential(*[nn.MaxPool1d(3, stride=1, padding=1), Conv(ni, nf, 1, coord=coord, bias=False)])
         self.concat = Concat()
         _norm_act = []

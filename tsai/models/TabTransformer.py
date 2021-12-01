@@ -243,12 +243,12 @@ class _TabEncoder(nn.Module):
     def forward(self, src, attn_mask=None):
         output = src
         scores = None
-        if self.res_attention:
-            for mod in self.layers: output, scores = mod(output, prev=scores, attn_mask=attn_mask)
-            return output
-        else:
-            for mod in self.layers: output = mod(output, attn_mask=attn_mask)
-            return output
+        for mod in self.layers:
+            if self.res_attention:
+                output, scores = mod(output, prev=scores, attn_mask=attn_mask)
+            else:
+                output = mod(output, attn_mask=attn_mask)
+        return output
 
 
 class TabTransformer(nn.Module):

@@ -59,8 +59,7 @@ def create_variable_mask(o, r=.15):
         p = torch.tensor([1./(n_masks * mask_dims)], device=device).repeat([n_masks * mask_dims])
         sel_dims = p.multinomial(num_samples=n_masked_vars, replacement=False)
         _mask[sel_dims] = 1
-    mask = _mask.reshape(*o.shape).bool()
-    return mask
+    return _mask.reshape(*o.shape).bool()
 
 def create_future_mask(o, r=.15, sync=False):
     if r <= 0: return torch.zeros_like(o).bool()
@@ -211,8 +210,8 @@ class MVP(Callback):
             self.mask = self.mask[..., w_start:w_start+ws]
 
     def after_epoch(self):
-        val = self.learn.recorder.values[-1][-1]
         if self.save_best:
+            val = self.learn.recorder.values[-1][-1]
             if np.less(val, self.best):
                 self.best = val
                 self.best_epoch = self.epoch

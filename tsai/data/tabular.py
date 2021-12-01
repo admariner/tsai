@@ -20,11 +20,15 @@ def get_tabular_ds(df, procs=[Categorify, FillMissing, Normalize], cat_names=Non
     for _cols in [groupby, cat_names, cont_names, y_names]:
         if _cols is not None: cols.extend(_cols)
     cols = list(set(cols))
-    if y_names is None: y_block = None
-    elif y_block is None:
+    if y_names is None or y_block is not None: y_block = None
+    else:
         num_cols = df._get_numeric_data().columns
-        y_block = CategoryBlock() if any([True for n in y_names if n not in num_cols]) else RegressionBlock()
-    else: y_block = None
+        y_block = (
+            CategoryBlock()
+            if any(True for n in y_names if n not in num_cols)
+            else RegressionBlock()
+        )
+
     pd.options.mode.chained_assignment=None
     to = TabularPandas(df[cols], procs=procs, cat_names=cat_names, cont_names=cont_names, y_names=y_names, y_block=y_block,
                        splits=splits, do_setup=do_setup, inplace=inplace, reduce_memory=reduce_memory, device=device)
@@ -37,8 +41,7 @@ def get_tabular_dls(df, procs=[Categorify, FillMissing, Normalize], cat_names=No
                     y_block=None, splits=None, do_setup=True, inplace=False, reduce_memory=True, device=None, **kwargs):
     to = get_tabular_ds(df, procs=procs, cat_names=cat_names, cont_names=cont_names, y_names=y_names,
                         y_block=y_block, splits=splits, do_setup=do_setup, inplace=inplace, reduce_memory=reduce_memory, device=device, **kwargs)
-    if splits is not None: bs = min(len(splits[0]), bs)
-    else: bs = min(len(df), bs)
+    bs = min(len(splits[0]), bs) if splits is not None else min(len(df), bs)
     return to.dataloaders(device=device, bs=bs, **kwargs)
 
 # Cell

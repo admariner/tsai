@@ -86,9 +86,8 @@ class MiniRocketFeatures(nn.Module):
                 if self.fitting:
                     if i < self.num_dilations - 1:
                         continue
-                    else:
-                        self.prefit = torch.BoolTensor([True])
-                        return
+                    self.prefit = torch.BoolTensor([True])
+                    return
                 elif i == self.num_dilations - 1:
                     self.prefit = torch.BoolTensor([True])
             else:
@@ -145,8 +144,11 @@ class MiniRocketFeatures(nn.Module):
         np.random.seed(self.random_state)
         idxs = np.random.choice(C.shape[0], self.num_kernels)
         samples = C[idxs].diagonal().T
-        biases = torch.quantile(samples, self._get_quantiles(num_features_this_dilation).to(C.device), dim=1).T
-        return biases
+        return torch.quantile(
+            samples,
+            self._get_quantiles(num_features_this_dilation).to(C.device),
+            dim=1,
+        ).T
 
 MRF = MiniRocketFeatures
 
@@ -157,9 +159,7 @@ def get_minirocket_features(o, model, chunksize=1024, use_cuda=None, to_np=True)
     device = torch.device(torch.cuda.current_device()) if use else torch.device('cpu')
     model = model.to(device)
     if isinstance(o, np.ndarray): o = torch.from_numpy(o).to(device)
-    _features = []
-    for oi in torch.split(o, chunksize):
-        _features.append(model(oi))
+    _features = [model(oi) for oi in torch.split(o, chunksize)]
     features = torch.cat(_features).unsqueeze(-1)
     if to_np: return features.cpu().numpy()
     else: return features

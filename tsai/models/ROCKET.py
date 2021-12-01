@@ -102,7 +102,7 @@ class ROCKET(nn.Module):
         device = ifnone(device, default_device())
         kss = [ks for ks in kss if ks < seq_len]
         convs = nn.ModuleList()
-        for i in range(n_kernels):
+        for _ in range(n_kernels):
             ks = np.random.choice(kss)
             dilation = 2**np.random.uniform(0, np.log2((seq_len - 1) // (ks - 1)))
             padding = int((ks - 1) * dilation // 2) if np.random.randint(2) == 1 else 0

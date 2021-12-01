@@ -217,6 +217,4 @@ class TSPerceiver(Module):
 
         x = x.transpose(1,2)
 
-        #Head
-        out = self.head(x)
-        return out
+        return self.head(x)

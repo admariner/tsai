@@ -182,7 +182,6 @@ def plot_splits(splits):
         v = np.ones((len(_splits), _max + 1))
         plt.pcolormesh(v, color='blue')
         legend_elements = [Patch(facecolor='blue', label='Train')]
-        plt.legend(handles=legend_elements, bbox_to_anchor=(1.05, 1), loc='upper left')
     else:
         colors = L(['gainsboro', 'blue', 'limegreen', 'red'])[vals]
         cmap = matplotlib.colors.LinearSegmentedColormap.from_list('', colors)
@@ -192,7 +191,7 @@ def plot_splits(splits):
             Patch(facecolor='blue', label='Train'),
             Patch(facecolor='limegreen', label='Valid'),
             Patch(facecolor='red', label='Test')])[vals]
-        plt.legend(handles=legend_elements, bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.legend(handles=legend_elements, bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.title('Split distribution')
     plt.yticks(ticks=np.arange(.5, len(_splits)+.5, 1.0), labels=np.arange(1, len(_splits)+1, 1.0).astype(int))
     plt.gca().invert_yaxis()
@@ -220,24 +219,24 @@ def get_splits(o, n_splits:int=1, valid_size:float=0.2, test_size:float=0., trai
     if balance: stratify = True
     splits = TrainValidTestSplitter(n_splits, valid_size=valid_size, test_size=test_size, train_only=train_only, stratify=stratify,
                                       balance=balance, shuffle=shuffle, random_state=random_state, verbose=verbose)(o)
-    if check_splits:
-        if train_only or (n_splits == 1 and valid_size == 0): print('valid == train')
-        elif n_splits > 1:
+    if train_only or (n_splits == 1 and valid_size == 0):
+        if check_splits: print('valid == train')
+    elif n_splits > 1:
+        if check_splits:
             for i in range(n_splits):
                 leakage_finder([*splits[i]], verbose=True)
-                cum_len = 0
-                for split in splits[i]: cum_len += len(split)
+                cum_len = sum(len(split) for split in splits[i])
                 if not balance: assert len(o) == cum_len, f'len(o)={len(o)} while cum_len={cum_len}'
-        else:
-            leakage_finder([splits], verbose=True)
-            cum_len = 0
-            if not isinstance(splits[0], Integral):
-                for split in splits: cum_len += len(split)
-            else: cum_len += len(splits)
-            if not balance: assert len(o) == cum_len, f'len(o)={len(o)} while cum_len={cum_len}'
+    elif check_splits:
+        leakage_finder([splits], verbose=True)
+        cum_len = 0
+        if not isinstance(splits[0], Integral):
+            for split in splits: cum_len += len(split)
+        else: cum_len += len(splits)
+        if not balance: assert len(o) == cum_len, f'len(o)={len(o)} while cum_len={cum_len}'
     if train_size is not None and train_size != 1: # train_size=1 legacy
+        splits = list(splits)
         if n_splits > 1:
-            splits = list(splits)
             for i in range(n_splits):
                 splits[i] = list(splits[i])
                 if isinstance(train_size, Integral):
@@ -249,9 +248,7 @@ def get_splits(o, n_splits:int=1, valid_size:float=0.2, test_size:float=0., trai
                     if valid_size != 0: splits[i][1] = splits[i][0]
                     if test_size != 0: splits[i][2] = splits[i][0]
                 splits[i] = tuple(splits[i])
-            splits = tuple(splits)
         else:
-            splits = list(splits)
             if isinstance(train_size, Integral):
                 n_train_samples = train_size
             elif train_size > 0 and train_size < 1:
@@ -260,7 +257,7 @@ def get_splits(o, n_splits:int=1, valid_size:float=0.2, test_size:float=0., trai
             if train_only:
                 if valid_size != 0: splits[1] = splits[0]
                 if test_size != 0: splits[2] = splits[0]
-            splits = tuple(splits)
+        splits = tuple(splits)
     if show_plot: plot_splits(splits)
     return splits
 
